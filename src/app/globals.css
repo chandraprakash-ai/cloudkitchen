@@ -1,0 +1,166 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-emerald: #064e3b;
+  --color-emerald-light: #10b981;
+  --color-emerald-dark: #022c22;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-surface: #F5F5F0;
+  --color-surface-paper: #FFFFFF;
+  --color-surface-dark: #111827;
+  --color-price: #059669;
+  --color-saffron: #d4a443;
+  --color-warm-ivory: #f5f0e8;
+
+  --font-display: "DM Serif Display", serif;
+  --font-body: "Outfit", sans-serif;
+}
+
+/* ---- Base ---- */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-surface);
+  color: var(--color-surface-dark);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ---- Scrollbar ---- */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ---- Material Symbols ---- */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+.material-symbols-outlined.filled {
+  font-variation-settings: 'FILL' 1;
+}
+
+/* ---- Animations ---- */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.15); }
+  80% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-bounce-in {
+  animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* ---- Active press effect ---- */
+.press-scale {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.press-scale:active {
+  transform: scale(0.95);
+}
+
+/* ---- Cart badge pulse ---- */
+.badge-pulse {
+  animation: pulse-badge 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ---- Skeleton loader ---- */
+.skeleton {
+  background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+}
+
+/* ---- Safe area padding ---- */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---- Bottom nav safe spacing ---- */
+.pb-nav {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- Glassmorphism ---- */
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-dark {
+  background: rgba(6, 78, 59, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ---- Veg badge ---- */
+.veg-dot {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #16a34a;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.veg-dot::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  background: #16a34a;
+  border-radius: 50%;
+}

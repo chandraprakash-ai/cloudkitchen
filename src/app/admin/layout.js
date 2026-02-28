@@ -1,8 +1,7 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
-
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 const adminNav = [
     { name: "Dashboard", href: "/admin", icon: "dashboard" },
     { name: "Orders", href: "/admin/orders", icon: "receipt_long" },
@@ -12,8 +11,48 @@ const adminNav = [
 
 export default function AdminLayout({ children }) {
     const pathname = usePathname();
+    const router = useRouter();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        let mounted = true;
+        const checkAuth = () => {
+            if (!mounted) return;
+            const isAuthenticated = localStorage.getItem("adminAuth") === "true";
+
+            if (!isAuthenticated && pathname !== '/admin/login') {
+                router.push('/admin/login');
+            } else if (isAuthenticated && pathname === '/admin/login') {
+                router.push('/admin');
+            } else {
+                setIsLoading(false);
+            }
+        };
+        checkAuth();
+
+        return () => {
+            mounted = false;
+        };
+    }, [pathname, router]);
+
+    const handleSignOut = () => {
+        localStorage.removeItem("adminAuth");
+        router.push('/admin/login');
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-surface flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full border-2 border-emerald border-t-transparent animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (pathname === '/admin/login') {
+        return <>{children}</>;
+    }
 
     const sidebarWidth = isDesktopCollapsed ? "w-20" : "w-64";
     const mainMargin = isDesktopCollapsed ? "lg:ml-20" : "lg:ml-64";
@@ -81,6 +120,16 @@ export default function AdminLayout({ children }) {
                                 <p className="text-sm font-medium text-white truncate">Admin User</p>
                                 <p className="text-[11px] text-emerald-light/80 truncate">Manager</p>
                             </div>
+                        )}
+                        {!isDesktopCollapsed && (
+                            <button onClick={handleSignOut} className="p-1.5 hover:bg-white/10 rounded-lg text-white/70 hover:text-white transition-colors shrink-0" title="Sign Out">
+                                <span className="material-symbols-outlined text-[18px]">logout</span>
+                            </button>
+                        )}
+                        {isDesktopCollapsed && (
+                            <button onClick={handleSignOut} className="absolute bottom-4 left-1/2 -translate-x-1/2 w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors" title="Sign Out">
+                                <span className="material-symbols-outlined text-[18px]">logout</span>
+                            </button>
                         )}
                     </div>
                 </div>

@@ -28,18 +28,23 @@ function MenuContent() {
 
     useEffect(() => {
         async function fetchMenu() {
-            setLoading(true);
-            const { data, error } = await supabase
-                .from('menu_items')
-                .select('*')
-                .order('created_at', { ascending: false });
+            try {
+                setLoading(true);
+                const { data, error } = await supabase
+                    .from('menu_items')
+                    .select('*')
+                    .order('created_at', { ascending: false });
 
-            if (error) {
-                console.error("Error fetching menu items:", error);
-            } else {
-                setMenuItems(data || []);
+                if (error) {
+                    console.error("Error fetching menu items:", error);
+                } else {
+                    setMenuItems(data || []);
+                }
+            } catch (error) {
+                console.error("Error fetching menu data:", error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         }
         fetchMenu();
     }, []);
@@ -61,7 +66,7 @@ function MenuContent() {
                     <div className="flex items-center gap-2">
                         <Link href="/" className="press-scale mt-1">
                             <span className="material-symbols-outlined text-white/70 text-[20px]">arrow_back</span>
-                            
+
                         </Link>
                         <h1 className="font-display text-xl leading-none tracking-tight">Menu</h1>
                     </div>

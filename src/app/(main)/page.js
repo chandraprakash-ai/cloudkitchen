@@ -23,36 +23,40 @@ export default function HomePage() {
 
     useEffect(() => {
         async function fetchHomeData() {
-            setLoading(true);
+            try {
+                setLoading(true);
 
-            const [popularRes, featuredRes, bestRes] = await Promise.all([
-                supabase
-                    .from('menu_items')
-                    .select('*')
-                    .eq('is_popular', true)
-                    .eq('in_stock', true)
-                    .order('created_at', { ascending: false })
-                    .limit(6),
-                supabase
-                    .from('menu_items')
-                    .select('*')
-                    .eq('is_featured', true)
-                    .eq('in_stock', true)
-                    .order('created_at', { ascending: false })
-                    .limit(6),
-                supabase
-                    .from('menu_items')
-                    .select('*')
-                    .eq('in_stock', true)
-                    .order('rating', { ascending: false })
-                    .limit(4),
-            ]);
+                const [popularRes, featuredRes, bestRes] = await Promise.all([
+                    supabase
+                        .from('menu_items')
+                        .select('*')
+                        .eq('is_popular', true)
+                        .eq('in_stock', true)
+                        .order('created_at', { ascending: false })
+                        .limit(6),
+                    supabase
+                        .from('menu_items')
+                        .select('*')
+                        .eq('is_featured', true)
+                        .eq('in_stock', true)
+                        .order('created_at', { ascending: false })
+                        .limit(6),
+                    supabase
+                        .from('menu_items')
+                        .select('*')
+                        .eq('in_stock', true)
+                        .order('rating', { ascending: false })
+                        .limit(4),
+                ]);
 
-            if (popularRes.data) setPopularItems(popularRes.data);
-            if (featuredRes.data) setFeaturedItems(featuredRes.data);
-            if (bestRes.data) setBestItems(bestRes.data);
-
-            setLoading(false);
+                if (popularRes.data) setPopularItems(popularRes.data);
+                if (featuredRes.data) setFeaturedItems(featuredRes.data);
+                if (bestRes.data) setBestItems(bestRes.data);
+            } catch (error) {
+                console.error("Error fetching home data:", error);
+            } finally {
+                setLoading(false);
+            }
         }
         fetchHomeData();
     }, []);

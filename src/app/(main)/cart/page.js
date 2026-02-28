@@ -15,12 +15,20 @@ export default function CartPage() {
         try {
             const displayId = `#ORD-${Math.floor(1000 + Math.random() * 9000)}`;
 
+            let userId = localStorage.getItem("guest_user_id");
+            if (!userId) {
+                // Generate a random UUID-like string for guest tracking
+                userId = "guest_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem("guest_user_id", userId);
+            }
+
             // 1. Create order
             const { data: orderParams, error: orderError } = await supabase.from('orders').insert({
                 display_id: displayId,
                 customer_name: 'Guest Customer',
                 status: 'new',
-                total_amount: total
+                total_amount: total,
+                guest_user_id: userId
             }).select().single();
 
             if (orderError) throw orderError;

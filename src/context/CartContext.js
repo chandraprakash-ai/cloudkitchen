@@ -11,7 +11,7 @@ export function CartProvider({ children }) {
     useEffect(() => {
         try {
             const saved = localStorage.getItem("ck-cart");
-            if (saved) setItems(JSON.parse(saved));
+            if (saved) setItems(JSON.parse(saved))
         } catch { }
     }, []);
 

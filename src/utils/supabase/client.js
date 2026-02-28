@@ -7,7 +7,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.warn("Supabase credentials not found in environment variables. Please check your .env.local file.");
 }
 
+const createSafeStorage = () => {
+    if (typeof window === "undefined") return null;
+    try {
+        window.localStorage.getItem('test');
+        return window.localStorage;
+    } catch (e) {
+        console.warn('localStorage is disabled or unavailable. Falling back to memory storage.');
+        return null;
+    }
+};
+
 export const supabase = createClient(
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    {
+        auth: {
+            storage: createSafeStorage(),
+            persistSession: !!createSafeStorage(),
+            autoRefreshToken: !!createSafeStorage(),
+            detectSessionInUrl: false
+        }
+    }
 );

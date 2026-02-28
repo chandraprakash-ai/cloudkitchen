@@ -16,29 +16,33 @@ export default function ActiveOrderCard() {
 
     useEffect(() => {
         async function fetchActiveOrder() {
-            // Get latest non-delivered order
-            const { data: orders, error } = await supabase
-                .from("orders")
-                .select("*")
-                .in("status", ["new", "cooking", "ready"])
-                .order("created_at", { ascending: false })
-                .limit(1);
+            try {
+                // Get latest non-delivered order
+                const { data: orders, error } = await supabase
+                    .from("orders")
+                    .select("*")
+                    .in("status", ["new", "cooking", "ready"])
+                    .order("created_at", { ascending: false })
+                    .limit(1);
 
-            if (error || !orders || orders.length === 0) {
-                setOrder(null);
-                return;
+                if (error || !orders || orders.length === 0) {
+                    setOrder(null);
+                    return;
+                }
+
+                const activeOrder = orders[0];
+                setOrder(activeOrder);
+
+                // Fetch order items with menu item names
+                const { data: orderItems } = await supabase
+                    .from("order_items")
+                    .select("*, menu_items(name, image)")
+                    .eq("order_id", activeOrder.id);
+
+                if (orderItems) setItems(orderItems);
+            } catch (err) {
+                console.error("ActiveOrderCard fetch error:", err);
             }
-
-            const activeOrder = orders[0];
-            setOrder(activeOrder);
-
-            // Fetch order items with menu item names
-            const { data: orderItems } = await supabase
-                .from("order_items")
-                .select("*, menu_items(name, image)")
-                .eq("order_id", activeOrder.id);
-
-            if (orderItems) setItems(orderItems);
         }
 
         fetchActiveOrder();

@@ -1,50 +1,83 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import FoodCard from "@/components/FoodCard";
 import { useCart } from "@/context/CartContext";
-import { categories, menuItems } from "@/data/menu";
+import { categories } from "@/data/menu";
+import { supabase } from "@/utils/supabase/client";
 
 function MenuContent() {
     const searchParams = useSearchParams();
     const initialCategory = searchParams.get("category") || "all";
+    const initialSearch = searchParams.get("search") || "";
     const [activeCategory, setActiveCategory] = useState(initialCategory);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [searchQuery, setSearchQuery] = useState(initialSearch);
+    const [menuItems, setMenuItems] = useState([]);
+    const [loading, setLoading] = useState(true);
     const { totalItems, subtotal } = useCart();
+    const searchInputRef = useRef(null);
+    const shouldFocusSearch = searchParams.get("focus") === "search";
+
+    useEffect(() => {
+        if (shouldFocusSearch && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [shouldFocusSearch]);
+
+    useEffect(() => {
+        async function fetchMenu() {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('menu_items')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error("Error fetching menu items:", error);
+            } else {
+                setMenuItems(data || []);
+            }
+            setLoading(false);
+        }
+        fetchMenu();
+    }, []);
 
     const filtered = menuItems.filter((item) => {
-        const matchCategory = activeCategory === "all" || item.category === activeCategory;
+        const matchCategory = activeCategory === "all" || (item.categories && item.categories.includes(activeCategory));
         const matchSearch =
             !searchQuery ||
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.description.toLowerCase().includes(searchQuery.toLowerCase());
+            (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchCategory && matchSearch;
     });
 
     return (
         <div className="pb-nav">
-            {/* Header */}
-            <header className="sticky top-0 z-40 bg-white border-b border-gray-100 px-4 py-3">
-                <div className="flex items-center gap-3 mb-3">
-                    <Link href="/" className="p-1 -ml-1 press-scale">
-                        <span className="material-symbols-outlined text-surface-dark text-[22px]">arrow_back</span>
-                    </Link>
-                    <h1 className="text-lg font-bold text-surface-dark flex-1">Menu</h1>
-                    <div className="flex items-center gap-1 text-emerald">
-                        <span className="material-symbols-outlined text-[16px] filled">eco</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">100% Veg</span>
+            {/* Header — matches home page emerald for seamless transition */}
+            <header className="sticky top-0 z-40 bg-emerald text-white px-5 pt-4 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <Link href="/" className="press-scale mt-1">
+                            <span className="material-symbols-outlined text-white/70 text-[20px]">arrow_back</span>
+                            
+                        </Link>
+                        <h1 className="font-display text-xl leading-none tracking-tight">Menu</h1>
+                    </div>
+                    <div>
+                        <span className="material-symbols-outlined text-emerald-light text-[20px] filled">eco</span>
                     </div>
                 </div>
 
                 {/* Search */}
                 <div className="relative mb-3">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-[18px]">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 material-symbols-outlined text-[18px]">
                         search
                     </span>
                     <input
-                        className="w-full h-10 pl-9 pr-4 rounded-xl bg-surface text-surface-dark border-0 focus:ring-2 focus:ring-emerald-light/40 placeholder:text-gray-400 text-sm font-medium transition-all outline-none"
+                        ref={searchInputRef}
+                        className="w-full h-10 pl-9 pr-4 rounded-xl bg-white/15 text-white border-0 focus:ring-2 focus:ring-white/30 focus:bg-white/20 placeholder:text-white/50 text-sm font-medium transition-all outline-none"
                         placeholder="Search dishes..."
                         type="text"
                         value={searchQuery}
@@ -59,8 +92,8 @@ function MenuContent() {
                             key={cat.id}
                             onClick={() => setActiveCategory(cat.id)}
                             className={`flex-none px-4 py-2 rounded-full text-[12px] font-semibold transition-all press-scale ${activeCategory === cat.id
-                                    ? "bg-emerald text-white shadow-sm"
-                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                ? "bg-white text-emerald shadow-sm"
+                                : "bg-white/15 text-white/80 hover:bg-white/25"
                                 }`}
                         >
                             {cat.name}
@@ -70,22 +103,31 @@ function MenuContent() {
             </header>
 
             {/* Menu Grid */}
-            <main className="px-4 py-4">
-                <p className="text-[11px] text-gray-500 mb-3 px-1">
-                    Showing {filtered.length} item{filtered.length !== 1 ? "s" : ""}
-                </p>
-                {filtered.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
-                        {filtered.map((item, i) => (
-                            <FoodCard key={item.id} item={item} index={i} />
-                        ))}
+            <main className="px-4 py-4 min-h-[50vh]">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+                        <div className="w-10 h-10 border-4 border-emerald/30 border-t-emerald rounded-full animate-spin mb-4"></div>
+                        <p className="text-sm font-medium text-gray-500">Loading fresh menu...</p>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                        <span className="material-symbols-outlined text-gray-300 text-[48px] mb-3">search_off</span>
-                        <p className="text-sm font-medium text-gray-500">No dishes found</p>
-                        <p className="text-[11px] text-gray-400 mt-1">Try a different search or category</p>
-                    </div>
+                    <>
+                        <p className="text-[11px] text-gray-500 mb-3 px-1">
+                            Showing {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+                        </p>
+                        {filtered.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-3">
+                                {filtered.map((item, i) => (
+                                    <FoodCard key={item.id} item={item} index={i} />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+                                <span className="material-symbols-outlined text-gray-300 text-[48px] mb-3">search_off</span>
+                                <p className="text-sm font-medium text-gray-500">No dishes found</p>
+                                <p className="text-[11px] text-gray-400 mt-1">Try a different search or category</p>
+                            </div>
+                        )}
+                    </>
                 )}
             </main>
 

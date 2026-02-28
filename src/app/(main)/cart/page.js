@@ -1,9 +1,52 @@
 "use client";
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { supabase } from "@/utils/supabase/client";
 
 export default function CartPage() {
     const { items, addItem, removeItem, deleteItem, clearCart, totalItems, subtotal, deliveryFee, tax, total } = useCart();
+    const router = useRouter();
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+    const handleCheckout = async () => {
+        setIsCheckingOut(true);
+        try {
+            const displayId = `#ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+
+            // 1. Create order
+            const { data: orderParams, error: orderError } = await supabase.from('orders').insert({
+                display_id: displayId,
+                customer_name: 'Guest Customer',
+                status: 'new',
+                total_amount: total
+            }).select().single();
+
+            if (orderError) throw orderError;
+
+            // 2. Create order items
+            const orderItemsData = items.map(item => ({
+                order_id: orderParams.id,
+                menu_item_id: item.id,
+                quantity: item.quantity,
+                price_at_time: item.price
+            }));
+
+            const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
+            if (itemsError) throw itemsError;
+
+            // 3. Success
+            clearCart();
+            alert(`Order placed successfully! Your ID is ${displayId}`);
+            router.push('/');
+        } catch (error) {
+            console.error("Checkout failed:", error);
+            alert("Failed to place order. Please try again.");
+        } finally {
+            setIsCheckingOut(false);
+        }
+    };
 
     if (items.length === 0) {
         return (
@@ -151,16 +194,20 @@ export default function CartPage() {
 
             {/* Checkout Button */}
             <div className="fixed bottom-[76px] left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[calc(var(--max-w,448px)-32px)] z-40">
-                <div className="bg-emerald text-white rounded-2xl px-5 py-3 flex items-center justify-between shadow-xl shadow-emerald/25 press-scale cursor-pointer">
-                    <div className="flex flex-col">
+                <button
+                    onClick={handleCheckout}
+                    disabled={isCheckingOut}
+                    className={`w-full bg-emerald text-white rounded-2xl px-5 py-3 flex items-center justify-between shadow-xl shadow-emerald/25 ${isCheckingOut ? 'opacity-80 cursor-wait' : 'press-scale hover:bg-emerald-dark transition-colors'}`}
+                >
+                    <div className="flex flex-col text-left">
                         <span className="text-[10px] font-medium text-white/60 uppercase tracking-wider">Total to pay</span>
                         <span className="text-lg font-bold">₹{total}</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-5 py-2.5">
-                        <span className="text-sm font-bold">Place Order</span>
-                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                        <span className="text-sm font-bold">{isCheckingOut ? 'Processing...' : 'Place Order'}</span>
+                        {!isCheckingOut && <span className="material-symbols-outlined text-[18px]">arrow_forward</span>}
                     </div>
-                </div>
+                </button>
             </div>
         </div>
     );

@@ -1,33 +1,76 @@
 "use client";
-import { useState } from "react";
-
-const initialOrders = {
-    new: [
-        { id: "ORD-8821", time: "10:42 AM", items: ["1x Clay Pot Veg Biryani", "2x Garlic Naan"], total: "₹510", customer: "Rahul S." },
-        { id: "ORD-8822", time: "10:45 AM", items: ["1x Royal Paneer Thali"], total: "₹249", customer: "Priya P." },
-    ],
-    cooking: [
-        { id: "ORD-8820", time: "10:30 AM", items: ["4x Margherita Pizza", "2x Mango Lassi"], total: "₹890", customer: "Amit R." },
-    ],
-    ready: [
-        { id: "ORD-8819", time: "10:15 AM", items: ["1x Super Green Salad"], total: "₹159", customer: "Sneha K." },
-    ],
-};
+import { useState, useEffect } from "react";
+import { supabase } from "@/utils/supabase/client";
 
 export default function OrdersManager() {
-    const [orders, setOrders] = useState(initialOrders);
+    const [orders, setOrders] = useState({ new: [], cooking: [], ready: [] });
+    const [loading, setLoading] = useState(true);
 
-    const moveOrder = (orderId, fromCol, toCol) => {
+    useEffect(() => {
+        fetchOrders();
+    }, []);
+
+    const fetchOrders = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('orders')
+            .select(`
+                *,
+                order_items (
+                    quantity,
+                    menu_items ( name )
+                )
+            `)
+            .order('created_at', { ascending: false });
+
+        if (!error && data) {
+            const grouped = { new: [], cooking: [], ready: [] };
+
+            data.forEach(order => {
+                const status = order.status || 'new';
+                // Only map known statuses
+                if (grouped[status]) {
+                    grouped[status].push({
+                        id: order.id, // DB primary key
+                        displayId: order.display_id || `#ORD-${order.id.slice(0, 4).toUpperCase()}`,
+                        time: new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        items: order.order_items?.map(oi => `${oi.quantity}x ${oi.menu_items?.name || 'Unknown Item'}`) || [],
+                        total: `₹${order.total_amount}`,
+                        customer: order.customer_name || 'Guest'
+                    });
+                }
+            });
+
+            setOrders(grouped);
+        } else {
+            console.error("Failed to fetch orders:", error);
+        }
+        setLoading(false);
+    };
+
+    const moveOrder = async (dbId, fromCol, toCol) => {
+        // Optimistic UI update
         setOrders(prev => {
-            const orderToMove = prev[fromCol].find(o => o.id === orderId);
+            const orderToMove = prev[fromCol].find(o => o.id === dbId);
             if (!orderToMove) return prev;
 
             return {
                 ...prev,
-                [fromCol]: prev[fromCol].filter(o => o.id !== orderId),
-                [toCol]: [...prev[toCol], orderToMove]
+                [fromCol]: prev[fromCol].filter(o => o.id !== dbId),
+                [toCol]: [orderToMove, ...prev[toCol]] // Add to top of new column
             };
         });
+
+        // Database update
+        const { error } = await supabase
+            .from('orders')
+            .update({ status: toCol })
+            .eq('id', dbId);
+
+        if (error) {
+            console.error("Failed to update order status:", error);
+            // Optionally revert UI on error here
+        }
     };
 
     const Column = ({ title, count, color, id, items, nextCol, nextLabel }) => (
@@ -43,11 +86,17 @@ export default function OrdersManager() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                {items.length === 0 && !loading && (
+                    <div className="flex flex-col items-center justify-center h-full text-center opacity-50">
+                        <span className="material-symbols-outlined text-[32px] mb-2 text-gray-300">receipt_long</span>
+                        <p className="text-xs font-semibold text-gray-500">No orders here</p>
+                    </div>
+                )}
                 {items.map((order, i) => (
                     <div key={order.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col group animate-slide-up opacity-0" style={{ animationFillMode: 'forwards', animationDelay: `${i * 0.05}s` }}>
                         <div className="flex justify-between items-start mb-3">
                             <div>
-                                <span className="text-sm font-bold text-surface-dark">{order.id}</span>
+                                <span className="text-sm font-bold text-surface-dark">{order.displayId}</span>
                                 <div className="text-[11px] text-gray-500 mt-0.5">{order.time}</div>
                             </div>
                             <span className="text-sm font-bold text-emerald-dark">{order.total}</span>
@@ -96,6 +145,13 @@ export default function OrdersManager() {
                     />
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={fetchOrders}
+                        className="h-10 px-4 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                    >
+                        <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>sync</span>
+                        Refresh
+                    </button>
                     <button className="h-10 px-4 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-700 flex items-center gap-2 hover:bg-gray-50 transition-colors">
                         <span className="material-symbols-outlined text-[18px]">filter_list</span>
                         Filter

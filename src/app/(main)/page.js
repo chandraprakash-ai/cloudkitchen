@@ -1,68 +1,99 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import FoodCard from "@/components/FoodCard";
 import { useCart } from "@/context/CartContext";
-import { categories, menuItems } from "@/data/menu";
+import { categories } from "@/data/menu";
+import { supabase } from "@/utils/supabase/client";
+import ActiveOrderCard from "@/components/ActiveOrderCard";
 
 export default function HomePage() {
+    const router = useRouter();
     const { totalItems, subtotal } = useCart();
-    const [searchFocused, setSearchFocused] = useState(false);
-    const popularItems = menuItems.filter((i) => i.isPopular);
+
+    const [popularItems, setPopularItems] = useState([]);
+    const [featuredItems, setFeaturedItems] = useState([]);
+    const [bestItems, setBestItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    // Time-aware greeting
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+
+    useEffect(() => {
+        async function fetchHomeData() {
+            setLoading(true);
+
+            const [popularRes, featuredRes, bestRes] = await Promise.all([
+                supabase
+                    .from('menu_items')
+                    .select('*')
+                    .eq('is_popular', true)
+                    .eq('in_stock', true)
+                    .order('created_at', { ascending: false })
+                    .limit(6),
+                supabase
+                    .from('menu_items')
+                    .select('*')
+                    .eq('is_featured', true)
+                    .eq('in_stock', true)
+                    .order('created_at', { ascending: false })
+                    .limit(6),
+                supabase
+                    .from('menu_items')
+                    .select('*')
+                    .eq('in_stock', true)
+                    .order('rating', { ascending: false })
+                    .limit(4),
+            ]);
+
+            if (popularRes.data) setPopularItems(popularRes.data);
+            if (featuredRes.data) setFeaturedItems(featuredRes.data);
+            if (bestRes.data) setBestItems(bestRes.data);
+
+            setLoading(false);
+        }
+        fetchHomeData();
+    }, []);
+
 
     return (
         <div className="pb-nav">
             {/* ── Header ── */}
-            <header className="sticky top-0 z-40 bg-emerald text-white px-5 pt-5 pb-6 rounded-b-[24px] shadow-none">
-                <div className="flex items-center justify-between gap-4 mb-4">
-                    <div className="flex flex-col">
-                        <span className="text-[10px] font-medium text-emerald-light/80 uppercase tracking-[0.12em] mb-0.5">
-                            Delivering to
-                        </span>
-                        <div className="flex items-center gap-1 cursor-pointer group">
-                            <span className="font-bold text-lg leading-none tracking-tight">Home • 123 Green Way</span>
-                            <span className="material-symbols-outlined text-emerald-light text-lg group-hover:rotate-180 transition-transform duration-300">
-                                expand_more
-                            </span>
-                        </div>
-                    </div>
+            <header className="sticky top-0 z-40 bg-emerald text-white px-5 pt-4 pb-4">
+                <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <button className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors backdrop-blur-sm press-scale">
-                            <span className="material-symbols-outlined text-[20px]">notifications</span>
-                        </button>
-                        <Link
-                            href="/cart"
-                            className="relative p-2 rounded-full bg-white text-emerald shadow-none hover:bg-gray-100 transition-colors press-scale"
-                        >
-                            <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
-                            {totalItems > 0 && (
-                                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-emerald badge-pulse">
-                                    {totalItems}
-                                </span>
-                            )}
-                        </Link>
+                        <h1 className="font-display text-xl leading-none tracking-tight">Cloud Kitchen</h1>
+                        <span className="material-symbols-outlined text-[13px] text-emerald-light filled">eco</span>
                     </div>
+                    <Link
+                        href="/cart"
+                        className="relative p-2 rounded-xl hover:bg-white/15 text-white transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+                        {totalItems > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-emerald badge-pulse">
+                                {totalItems}
+                            </span>
+                        )}
+                    </Link>
                 </div>
 
-                {/* Search */}
-                <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-[20px]">
-                        search
-                    </span>
-                    <input
-                        className="w-full h-11 pl-10 pr-11 rounded-xl bg-white text-surface-dark border-0 shadow-none focus:ring-2 focus:ring-emerald-light/50 placeholder:text-gray-400 text-sm font-medium transition-all outline-none"
-                        placeholder="Search for fresh greens..."
-                        type="text"
-                        onFocus={() => setSearchFocused(true)}
-                        onBlur={() => setSearchFocused(false)}
-                    />
-                    <button className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-emerald hover:bg-emerald/10 transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">tune</span>
-                    </button>
+                {/* Search — taps through to menu page */}
+                <div
+                    onClick={() => router.push('/menu?focus=search')}
+                    className="relative flex items-center h-10 pl-9 pr-4 rounded-xl bg-white/15 cursor-pointer hover:bg-white/20 transition-colors"
+                >
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 material-symbols-outlined text-[18px]">search</span>
+                    <span className="text-sm text-white/50 font-medium">Search dishes...</span>
                 </div>
             </header>
 
             <main className="px-4 py-5 space-y-6">
+                {/* ── Active Order ── */}
+                <ActiveOrderCard />
+
                 {/* ── Categories ── */}
                 <section className="animate-fade-in">
                     <div className="flex items-center justify-between mb-3 px-1">
@@ -125,20 +156,75 @@ export default function HomePage() {
                     </div>
                 </section>
 
+                {/* ── Featured Items (Horizontal Scroll) ── */}
+                {featuredItems.length > 0 && (
+                    <section>
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-emerald text-[18px] filled">star</span>
+                                <h3 className="text-[15px] font-bold text-emerald">Featured</h3>
+                            </div>
+                            <Link href="/menu" className="text-emerald-light text-[11px] font-semibold hover:underline">
+                                See all
+                            </Link>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1 snap-x">
+                            {featuredItems.map((item, i) => (
+                                <div key={item.id} className="snap-start flex-none w-[160px]">
+                                    <FoodCard item={item} index={i} />
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
                 {/* ── Popular Menu ── */}
                 <section>
                     <div className="flex items-center justify-between mb-3 px-1">
-                        <h3 className="text-[15px] font-bold text-emerald">Popular Right Now</h3>
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-saffron text-[18px] filled">local_fire_department</span>
+                            <h3 className="text-[15px] font-bold text-emerald">Popular Right Now</h3>
+                        </div>
                         <Link href="/menu" className="text-emerald-light text-[11px] font-semibold hover:underline">
                             See all
                         </Link>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        {popularItems.slice(0, 6).map((item, i) => (
-                            <FoodCard key={item.id} item={item} index={i} />
-                        ))}
+                    <div className="grid grid-cols-2 gap-3 min-h-[150px]">
+                        {loading ? (
+                            <div className="col-span-2 flex flex-col items-center justify-center py-10 opacity-50">
+                                <div className="w-8 h-8 border-4 border-emerald/30 border-t-emerald rounded-full animate-spin"></div>
+                            </div>
+                        ) : popularItems.length > 0 ? (
+                            popularItems.map((item, i) => (
+                                <FoodCard key={item.id} item={item} index={i} />
+                            ))
+                        ) : (
+                            <div className="col-span-2 text-center text-sm text-gray-400 py-8">
+                                No popular items available
+                            </div>
+                        )}
                     </div>
                 </section>
+
+                {/* ── Our Best Items ── */}
+                {bestItems.length > 0 && (
+                    <section>
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-emerald text-[18px] filled">workspace_premium</span>
+                                <h3 className="text-[15px] font-bold text-emerald">Our Best</h3>
+                            </div>
+                            <Link href="/menu" className="text-emerald-light text-[11px] font-semibold hover:underline">
+                                View all
+                            </Link>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            {bestItems.map((item, i) => (
+                                <FoodCard key={item.id} item={item} index={i} />
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 {/* ── Why Choose Us ── */}
                 <section className="animate-fade-in">

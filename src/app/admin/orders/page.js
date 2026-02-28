@@ -11,41 +11,46 @@ export default function OrdersManager() {
     }, []);
 
     const fetchOrders = async () => {
-        setLoading(true);
-        const { data, error } = await supabase
-            .from('orders')
-            .select(`
-                *,
-                order_items (
-                    quantity,
-                    menu_items ( name )
-                )
-            `)
-            .order('created_at', { ascending: false });
+        try {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('orders')
+                .select(`
+                    *,
+                    order_items (
+                        quantity,
+                        menu_items ( name )
+                    )
+                `)
+                .order('created_at', { ascending: false });
 
-        if (!error && data) {
-            const grouped = { new: [], cooking: [], ready: [] };
+            if (!error && data) {
+                const grouped = { new: [], cooking: [], ready: [] };
 
-            data.forEach(order => {
-                const status = order.status || 'new';
-                // Only map known statuses
-                if (grouped[status]) {
-                    grouped[status].push({
-                        id: order.id, // DB primary key
-                        displayId: order.display_id || `#ORD-${order.id.slice(0, 4).toUpperCase()}`,
-                        time: new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        items: order.order_items?.map(oi => `${oi.quantity}x ${oi.menu_items?.name || 'Unknown Item'}`) || [],
-                        total: `₹${order.total_amount}`,
-                        customer: order.customer_name || 'Guest'
-                    });
-                }
-            });
+                data.forEach(order => {
+                    const status = order.status || 'new';
+                    // Only map known statuses
+                    if (grouped[status]) {
+                        grouped[status].push({
+                            id: order.id, // DB primary key
+                            displayId: order.display_id || `#ORD-${order.id.slice(0, 4).toUpperCase()}`,
+                            time: new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            items: order.order_items?.map(oi => `${oi.quantity}x ${oi.menu_items?.name || 'Unknown Item'}`) || [],
+                            total: `₹${order.total_amount}`,
+                            customer: order.customer_name || 'Guest'
+                        });
+                    }
+                });
 
-            setOrders(grouped);
-        } else {
-            console.error("Failed to fetch orders:", error);
+                setOrders(grouped);
+            } else {
+                console.error("Failed to fetch orders:", error);
+            }
+        } catch (error) {
+            console.error("Fetch orders exception:", error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const moveOrder = async (dbId, fromCol, toCol) => {

@@ -40,12 +40,19 @@ export default function MenuManager() {
     }, []);
 
     const fetchItems = async () => {
-        setLoading(true);
-        const { data, error } = await supabase.from('menu_items').select('*').order('created_at', { ascending: false });
-        if (!error && data) {
-            setItems(data);
+        try {
+            setLoading(true);
+            const { data, error } = await supabase.from('menu_items').select('*').order('created_at', { ascending: false });
+            if (!error && data) {
+                setItems(data);
+            } else if (error) {
+                console.error("Error fetching menu items:", error);
+            }
+        } catch (error) {
+            console.error("Error fetching menu data:", error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const toggleStock = async (id) => {

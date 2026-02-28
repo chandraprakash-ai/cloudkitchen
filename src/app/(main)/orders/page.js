@@ -17,20 +17,26 @@ export default function OrdersPage() {
 
     useEffect(() => {
         async function fetchOrders() {
-            const { data, error } = await supabase
-                .from("orders")
-                .select(`
-                    *,
-                    order_items (
-                        quantity,
-                        price_at_time,
-                        menu_items ( name, image )
-                    )
-                `)
-                .order("created_at", { ascending: false });
+            try {
+                const { data, error } = await supabase
+                    .from("orders")
+                    .select(`
+                        *,
+                        order_items (
+                            quantity,
+                            price_at_time,
+                            menu_items ( name, image )
+                        )
+                    `)
+                    .order("created_at", { ascending: false });
 
-            if (!error && data) setOrders(data);
-            setLoading(false);
+                if (!error && data) setOrders(data);
+                else if (error) console.error("Error fetching orders:", error);
+            } catch (error) {
+                console.error("Order fetch exception:", error);
+            } finally {
+                setLoading(false);
+            }
         }
         fetchOrders();
         const interval = setInterval(fetchOrders, 15000);
@@ -62,8 +68,8 @@ export default function OrdersPage() {
                     <button
                         onClick={() => setTab("active")}
                         className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${tab === "active"
-                                ? "bg-emerald text-white shadow-sm"
-                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            ? "bg-emerald text-white shadow-sm"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                             }`}
                     >
                         Active
@@ -77,8 +83,8 @@ export default function OrdersPage() {
                     <button
                         onClick={() => setTab("history")}
                         className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${tab === "history"
-                                ? "bg-emerald text-white shadow-sm"
-                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                            ? "bg-emerald text-white shadow-sm"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                             }`}
                     >
                         History

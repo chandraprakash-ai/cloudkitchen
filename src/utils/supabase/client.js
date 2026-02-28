@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bqacfcanqwmyabubnzkp.supabase.co';
+const origUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bqacfcanqwmyabubnzkp.supabase.co';
+const isClient = typeof window !== 'undefined';
+const supabaseUrl = isClient ? window.location.origin + '/req-proxy' : origUrl;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_QXD5m3vw287hQqcTzE8CKg_ri3AK18M';
 
 if (!supabaseUrl || !supabaseAnonKey) {

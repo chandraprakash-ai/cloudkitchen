@@ -8,6 +8,14 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/req-proxy/:path*',
+        destination: 'https://bqacfcanqwmyabubnzkp.supabase.co/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -17,10 +17,19 @@ export default function ActiveOrderCard() {
     useEffect(() => {
         async function fetchActiveOrder() {
             try {
+                if (typeof window === "undefined") return;
+                const userId = localStorage.getItem("guest_user_id");
+
+                if (!userId) {
+                    setOrder(null);
+                    return;
+                }
+
                 // Get latest non-delivered order
                 const { data: orders, error } = await supabase
                     .from("orders")
                     .select("*")
+                    .eq("guest_user_id", userId)
                     .in("status", ["new", "cooking", "ready"])
                     .order("created_at", { ascending: false })
                     .limit(1);

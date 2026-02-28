@@ -8,6 +8,8 @@ import { categories } from "@/data/menu";
 import { supabase } from "@/utils/supabase/client";
 import ActiveOrderCard from "@/components/ActiveOrderCard";
 
+import PTR from "pulltorefreshjs";
+
 export default function HomePage() {
     const router = useRouter();
     const { totalItems, subtotal } = useCart();
@@ -20,6 +22,27 @@ export default function HomePage() {
     // Time-aware greeting
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+
+    const [refreshing, setRefreshing] = useState(false);
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            const [popularRes, featuredRes, bestRes] = await Promise.all([
+                supabase.from('menu_items').select('*').eq('is_popular', true).eq('in_stock', true).order('created_at', { ascending: false }).limit(6),
+                supabase.from('menu_items').select('*').eq('is_featured', true).eq('in_stock', true).order('created_at', { ascending: false }).limit(6),
+                supabase.from('menu_items').select('*').eq('in_stock', true).order('rating', { ascending: false }).limit(4),
+            ]);
+
+            if (popularRes.data) setPopularItems(popularRes.data);
+            if (featuredRes.data) setFeaturedItems(featuredRes.data);
+            if (bestRes.data) setBestItems(bestRes.data);
+        } catch (error) {
+            console.error("Refresh home data error:", error);
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
         async function fetchHomeData() {
@@ -59,6 +82,16 @@ export default function HomePage() {
             }
         }
         fetchHomeData();
+    }, []);
+
+    useEffect(() => {
+        PTR.init({
+            mainElement: 'body',
+            onRefresh() {
+                return handleRefresh();
+            }
+        });
+        return () => PTR.destroyAll();
     }, []);
 
 

@@ -18,6 +18,16 @@ export default function OrdersPage() {
     useEffect(() => {
         async function fetchOrders() {
             try {
+                if (typeof window === "undefined") return;
+                let userId = localStorage.getItem("guest_user_id");
+
+                // If there's absolutely no user ID string available locally, they have not placed any orders yet.
+                if (!userId) {
+                    setOrders([]);
+                    setLoading(false);
+                    return;
+                }
+
                 const { data, error } = await supabase
                     .from("orders")
                     .select(`
@@ -28,6 +38,7 @@ export default function OrdersPage() {
                             menu_items ( name, image )
                         )
                     `)
+                    .eq("guest_user_id", userId)
                     .order("created_at", { ascending: false });
 
                 if (!error && data) setOrders(data);

@@ -227,10 +227,10 @@ export default function DeliveryDashboard() {
                                             <p className="text-[11px] text-gray-500 font-medium">Order {order.display_id}</p>
 
                                             {order.customer_phone && (
-                                                <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-dark font-medium cursor-pointer" onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${order.customer_phone}`; }}>
+                                                <a href={`tel:${order.customer_phone}`} onClick={(e) => e.stopPropagation()} className="mt-2 inline-flex items-center gap-1.5 text-xs text-emerald-dark font-medium cursor-pointer hover:underline">
                                                     <span className="material-symbols-outlined text-[14px]">call</span>
                                                     {order.customer_phone}
-                                                </div>
+                                                </a>
                                             )}
                                         </div>
                                     </div>

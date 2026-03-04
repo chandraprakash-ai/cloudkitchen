@@ -7,11 +7,41 @@ const STATUS_CONFIG = {
     delivered: { label: "Delivered", icon: "check_circle", color: "emerald" },
 };
 
+const DELIVERY_PASSCODE = "deliver2024"; // Change this for production
+
 export default function DeliveryDashboard() {
     const [orders, setOrders] = useState({ ready: [], delivered: [] });
     const [loading, setLoading] = useState(true);
-    const [delivering, setDelivering] = useState(null); // order ID being delivered
+    const [delivering, setDelivering] = useState(null);
     const [tab, setTab] = useState("ready");
+
+    // Auth gate
+    const [isAuthed, setIsAuthed] = useState(false);
+    const [passcode, setPasscode] = useState("");
+    const [authError, setAuthError] = useState("");
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            setIsAuthed(localStorage.getItem("deliveryAuth") === "true");
+        }
+    }, []);
+
+    const handlePasscodeSubmit = (e) => {
+        e.preventDefault();
+        if (passcode === DELIVERY_PASSCODE) {
+            localStorage.setItem("deliveryAuth", "true");
+            setIsAuthed(true);
+            setAuthError("");
+        } else {
+            setAuthError("Invalid passcode");
+        }
+    };
+
+    const handleSignOut = () => {
+        localStorage.removeItem("deliveryAuth");
+        setIsAuthed(false);
+        setPasscode("");
+    };
 
     const fetchOrders = async () => {
         const { data, error } = await supabase
@@ -83,6 +113,47 @@ export default function DeliveryDashboard() {
     const deliveredCount = orders.delivered.length;
     const activeOrders = tab === "ready" ? orders.ready : orders.delivered;
 
+    // ── Auth Gate ──
+    if (!isAuthed) {
+        return (
+            <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-[360px]">
+                    <div className="text-center mb-8">
+                        <div className="w-14 h-14 bg-gray-900 text-white flex items-center justify-center rounded-2xl mx-auto mb-4">
+                            <span className="material-symbols-outlined text-[28px]">local_shipping</span>
+                        </div>
+                        <h1 className="font-display text-3xl text-surface-dark mb-1">Delivery Access</h1>
+                        <p className="text-sm text-gray-400">Enter your delivery partner passcode</p>
+                    </div>
+                    <form onSubmit={handlePasscodeSubmit} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+                        {authError && (
+                            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium text-center">
+                                {authError}
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1 mb-1.5 block">Passcode</label>
+                            <input
+                                type="password"
+                                value={passcode}
+                                onChange={(e) => setPasscode(e.target.value)}
+                                placeholder="••••••••"
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-sm font-medium text-surface-dark placeholder:text-gray-400 focus:outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-all"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className="w-full bg-gray-900 text-white rounded-xl py-3.5 text-sm font-bold hover:bg-gray-800 transition-colors active:scale-[0.98]"
+                        >
+                            Enter Dashboard
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="max-w-lg mx-auto">
             {/* Header */}
@@ -94,14 +165,23 @@ export default function DeliveryDashboard() {
                             {readyCount} pending • {deliveredCount} completed today
                         </p>
                     </div>
-                    <button
-                        onClick={() => { setLoading(true); fetchOrders(); }}
-                        className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                    >
-                        <span className={`material-symbols-outlined text-[20px] ${loading ? "animate-spin" : ""}`}>
-                            refresh
-                        </span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => { setLoading(true); fetchOrders(); }}
+                            className="p-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                        >
+                            <span className={`material-symbols-outlined text-[20px] ${loading ? "animate-spin" : ""}`}>
+                                refresh
+                            </span>
+                        </button>
+                        <button
+                            onClick={handleSignOut}
+                            className="p-2.5 rounded-xl bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-500 transition-colors"
+                            title="Sign Out"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">logout</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tabs */}
@@ -114,8 +194,8 @@ export default function DeliveryDashboard() {
                                 key={key}
                                 onClick={() => setTab(key)}
                                 className={`flex-1 py-2.5 rounded-xl text-[12px] font-semibold transition-all ${isActive
-                                        ? "bg-gray-900 text-white shadow-sm"
-                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                    ? "bg-gray-900 text-white shadow-sm"
+                                    : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                                     }`}
                             >
                                 <span className="material-symbols-outlined text-[14px] mr-1 align-[-3px]">
@@ -214,8 +294,8 @@ export default function DeliveryDashboard() {
                                             onClick={() => markDelivered(order.id)}
                                             disabled={delivering === order.id}
                                             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-bold transition-all ${delivering === order.id
-                                                    ? "bg-gray-200 text-gray-400 cursor-wait"
-                                                    : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm press-scale"
+                                                ? "bg-gray-200 text-gray-400 cursor-wait"
+                                                : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-sm press-scale"
                                                 }`}
                                         >
                                             <span className="material-symbols-outlined text-[16px]">

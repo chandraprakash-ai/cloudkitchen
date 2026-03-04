@@ -1,9 +1,11 @@
 "use client";
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 
 const CartContext = createContext();
 
 export function CartProvider({ children }) {
+    const { requireAuth } = useAuth();
     const [items, setItems] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
 
@@ -21,16 +23,18 @@ export function CartProvider({ children }) {
     }, [items]);
 
     const addItem = useCallback((item) => {
-        setItems((prev) => {
-            const existing = prev.find((i) => i.id === item.id);
-            if (existing) {
-                return prev.map((i) =>
-                    i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-                );
-            }
-            return [...prev, { ...item, quantity: 1 }];
+        requireAuth(() => {
+            setItems((prev) => {
+                const existing = prev.find((i) => i.id === item.id);
+                if (existing) {
+                    return prev.map((i) =>
+                        i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                    );
+                }
+                return [...prev, { ...item, quantity: 1 }];
+            });
         });
-    }, []);
+    }, [requireAuth]);
 
     const removeItem = useCallback((id) => {
         setItems((prev) => {

@@ -3,57 +3,114 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/utils/supabase/client";
+
+// Promo codes — add or change these anytime
+const PROMO_CODES = {
+    WELCOME10: { type: "percent", value: 10, label: "10% off" },
+    FIRST50: { type: "flat", value: 50, label: "₹50 off" },
+    FREESHIP: { type: "freeDelivery", value: 0, label: "Free delivery" },
+};
 
 export default function CartPage() {
     const { items, addItem, removeItem, deleteItem, clearCart, totalItems, subtotal, deliveryFee, tax, total } = useCart();
+    const { user, displayName, requireAuth } = useAuth();
     const router = useRouter();
     const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-    const handleCheckout = async () => {
-        setIsCheckingOut(true);
-        try {
-            const displayId = `#ORD-${Math.floor(1000 + Math.random() * 9000)}`;
+    // Promo code state
+    const [promoInput, setPromoInput] = useState("");
+    const [appliedPromo, setAppliedPromo] = useState(null);
+    const [promoError, setPromoError] = useState("");
+    const [promoSuccess, setPromoSuccess] = useState("");
 
-            let userId = localStorage.getItem("guest_user_id");
-            if (!userId) {
-                // Generate a random UUID-like string for guest tracking
-                userId = "guest_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem("guest_user_id", userId);
-            }
-
-            // 1. Create order
-            const { data: orderParams, error: orderError } = await supabase.from('orders').insert({
-                display_id: displayId,
-                customer_name: 'Guest Customer',
-                status: 'new',
-                total_amount: total,
-                guest_user_id: userId
-            }).select().single();
-
-            if (orderError) throw orderError;
-
-            // 2. Create order items
-            const orderItemsData = items.map(item => ({
-                order_id: orderParams.id,
-                menu_item_id: item.id,
-                quantity: item.quantity,
-                price_at_time: item.price
-            }));
-
-            const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
-            if (itemsError) throw itemsError;
-
-            // 3. Success
-            clearCart();
-            alert(`Order placed successfully! Your ID is ${displayId}`);
-            router.push('/');
-        } catch (error) {
-            console.error("Checkout failed:", error);
-            alert("Failed to place order. Please try again.");
-        } finally {
-            setIsCheckingOut(false);
+    // Calculate discount
+    let discount = 0;
+    let adjustedDeliveryFee = deliveryFee;
+    if (appliedPromo) {
+        if (appliedPromo.type === "percent") {
+            discount = Math.round(subtotal * (appliedPromo.value / 100));
+        } else if (appliedPromo.type === "flat") {
+            discount = Math.min(appliedPromo.value, subtotal);
+        } else if (appliedPromo.type === "freeDelivery") {
+            adjustedDeliveryFee = 0;
         }
+    }
+    const adjustedTotal = subtotal - discount + adjustedDeliveryFee + tax;
+
+    const handleApplyPromo = () => {
+        const code = promoInput.trim().toUpperCase();
+        setPromoError("");
+        setPromoSuccess("");
+
+        if (!code) { setPromoError("Enter a promo code"); return; }
+        if (appliedPromo) { setPromoError("A code is already applied"); return; }
+        const promo = PROMO_CODES[code];
+        if (!promo) { setPromoError("Invalid promo code"); return; }
+
+        setAppliedPromo({ code, ...promo });
+        setPromoSuccess(`"${code}" applied — ${promo.label}!`);
+        setPromoInput("");
+    };
+
+    const handleRemovePromo = () => {
+        setAppliedPromo(null);
+        setPromoSuccess("");
+        setPromoError("");
+    };
+
+    const handleCheckout = () => {
+        requireAuth(async () => {
+            setIsCheckingOut(true);
+            try {
+                const ts = Math.floor(Date.now() / 1000).toString(36).toUpperCase();
+                const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+                const displayId = `#ORD-${ts}-${rand}`;
+
+                // Fetch the freshest session to avoid stale closure if the user just logged in via the modal
+                const { data: { session } } = await supabase.auth.getSession();
+                let userId = session?.user?.id;
+                let finalCustomerName = displayName || session?.user?.user_metadata?.full_name || localStorage.getItem("ck-profile-name") || "Guest Customer";
+
+                if (!userId) {
+                    userId = localStorage.getItem("guest_user_id");
+                    if (!userId) {
+                        userId = "guest_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                        localStorage.setItem("guest_user_id", userId);
+                    }
+                }
+
+                const { data: orderParams, error: orderError } = await supabase.from('orders').insert({
+                    display_id: displayId,
+                    customer_name: finalCustomerName,
+                    status: 'new',
+                    total_amount: adjustedTotal,
+                    guest_user_id: userId
+                }).select().single();
+
+                if (orderError) throw orderError;
+
+                const orderItemsData = items.map(item => ({
+                    order_id: orderParams.id,
+                    menu_item_id: item.id,
+                    quantity: item.quantity,
+                    price_at_time: item.price
+                }));
+
+                const { error: itemsError } = await supabase.from('order_items').insert(orderItemsData);
+                if (itemsError) throw itemsError;
+
+                clearCart();
+                alert(`Order placed successfully! Your ID is ${displayId}`);
+                router.push('/');
+            } catch (error) {
+                console.error("Checkout failed:", error);
+                alert("Failed to place order. Please try again.");
+            } finally {
+                setIsCheckingOut(false);
+            }
+        });
     };
 
     if (items.length === 0) {
@@ -70,7 +127,7 @@ export default function CartPage() {
                         <span className="material-symbols-outlined text-emerald text-[36px]">shopping_bag</span>
                     </div>
                     <h2 className="text-lg font-bold text-surface-dark mb-1">Your cart is empty</h2>
-                    <p className="text-sm text-gray-500 mb-6">Looks like you haven't added any items yet</p>
+                    <p className="text-sm text-gray-500 mb-6">Looks like you haven&#39;t added any items yet</p>
                     <Link
                         href="/menu"
                         className="h-12 px-8 rounded-full bg-emerald text-white font-bold text-sm flex items-center gap-2 press-scale hover:bg-emerald-dark transition-colors"
@@ -150,16 +207,41 @@ export default function CartPage() {
                 </div>
 
                 {/* Promo Code */}
-                <div className="bg-white rounded-xl p-3 flex items-center gap-3">
-                    <span className="material-symbols-outlined text-emerald text-[20px]">confirmation_number</span>
-                    <input
-                        className="flex-1 h-8 bg-transparent text-sm font-medium text-surface-dark placeholder:text-gray-400 outline-none border-0"
-                        placeholder="Have a promo code?"
-                        type="text"
-                    />
-                    <button className="px-4 py-1.5 rounded-full border-2 border-emerald text-emerald text-[11px] font-bold uppercase tracking-wide hover:bg-emerald hover:text-white transition-colors press-scale">
-                        Apply
-                    </button>
+                <div className="bg-white rounded-xl p-3 space-y-2">
+                    {appliedPromo ? (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-emerald text-[18px] filled">check_circle</span>
+                                <div>
+                                    <span className="text-sm font-bold text-emerald-dark">{appliedPromo.code}</span>
+                                    <span className="text-[11px] text-gray-500 ml-1.5">— {appliedPromo.label}</span>
+                                </div>
+                            </div>
+                            <button onClick={handleRemovePromo} className="text-red-500 text-[11px] font-bold hover:underline press-scale">
+                                Remove
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-emerald text-[20px]">confirmation_number</span>
+                            <input
+                                className="flex-1 h-8 bg-transparent text-sm font-medium text-surface-dark placeholder:text-gray-400 outline-none border-0 uppercase"
+                                placeholder="Have a promo code?"
+                                type="text"
+                                value={promoInput}
+                                onChange={(e) => { setPromoInput(e.target.value); setPromoError(""); }}
+                                onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
+                            />
+                            <button
+                                onClick={handleApplyPromo}
+                                className="px-4 py-1.5 rounded-full border-2 border-emerald text-emerald text-[11px] font-bold uppercase tracking-wide hover:bg-emerald hover:text-white transition-colors press-scale"
+                            >
+                                Apply
+                            </button>
+                        </div>
+                    )}
+                    {promoError && <p className="text-[11px] text-red-500 font-medium pl-8">{promoError}</p>}
+                    {promoSuccess && !promoError && <p className="text-[11px] text-emerald font-medium pl-8">{promoSuccess}</p>}
                 </div>
 
                 {/* Payment Summary */}
@@ -170,13 +252,19 @@ export default function CartPage() {
                             <span className="text-gray-500">Subtotal</span>
                             <span className="font-medium text-surface-dark">₹{subtotal}</span>
                         </div>
+                        {discount > 0 && (
+                            <div className="flex justify-between text-[13px]">
+                                <span className="text-emerald-light">Promo Discount</span>
+                                <span className="font-medium text-emerald-light">-₹{discount}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-[13px]">
                             <span className="text-gray-500">Delivery Fee</span>
                             <span className="font-medium text-surface-dark">
-                                {deliveryFee === 0 ? (
+                                {adjustedDeliveryFee === 0 ? (
                                     <span className="text-emerald-light">FREE</span>
                                 ) : (
-                                    `₹${deliveryFee}`
+                                    `₹${adjustedDeliveryFee}`
                                 )}
                             </span>
                         </div>
@@ -184,7 +272,7 @@ export default function CartPage() {
                             <span className="text-gray-500">Tax (5%)</span>
                             <span className="font-medium text-surface-dark">₹{tax}</span>
                         </div>
-                        {subtotal > 0 && subtotal < 499 && (
+                        {subtotal > 0 && subtotal < 499 && adjustedDeliveryFee > 0 && (
                             <div className="flex items-center gap-2 bg-emerald-50 rounded-lg p-2.5 mt-1">
                                 <span className="material-symbols-outlined text-emerald text-[16px]">local_shipping</span>
                                 <span className="text-[11px] text-emerald-dark font-medium">
@@ -194,7 +282,7 @@ export default function CartPage() {
                         )}
                         <div className="border-t border-gray-100 pt-2 flex justify-between">
                             <span className="text-[15px] font-bold text-surface-dark">Total</span>
-                            <span className="text-[15px] font-bold text-emerald-dark">₹{total}</span>
+                            <span className="text-[15px] font-bold text-emerald-dark">₹{adjustedTotal}</span>
                         </div>
                     </div>
                 </div>
@@ -209,7 +297,7 @@ export default function CartPage() {
                 >
                     <div className="flex flex-col text-left">
                         <span className="text-[10px] font-medium text-white/60 uppercase tracking-wider">Total to pay</span>
-                        <span className="text-lg font-bold">₹{total}</span>
+                        <span className="text-lg font-bold">₹{adjustedTotal}</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-white/20 rounded-full px-5 py-2.5">
                         <span className="text-sm font-bold">{isCheckingOut ? 'Processing...' : 'Place Order'}</span>

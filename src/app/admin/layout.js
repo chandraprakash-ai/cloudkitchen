@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { supabase } from "@/utils/supabase/client";
 const adminNav = [
     { name: "Dashboard", href: "/admin", icon: "dashboard" },
     { name: "Orders", href: "/admin/orders", icon: "receipt_long" },
@@ -37,8 +38,9 @@ export default function AdminLayout({ children }) {
         };
     }, [pathname, router]);
 
-    const handleSignOut = () => {
+    const handleSignOut = async () => {
         localStorage.removeItem("adminAuth");
+        await supabase.auth.signOut();
         router.push('/admin/login');
     };
 

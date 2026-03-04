@@ -18,14 +18,23 @@ export const metadata = {
   title: "Cloud Kitchen — Pure Veg",
   description: "Fresh, wholesome vegetarian meals delivered to your door. Order from our curated menu of pure veg delights.",
   keywords: "cloud kitchen, vegetarian, pure veg, food delivery, fresh meals",
+  openGraph: {
+    title: "Cloud Kitchen — Pure Veg",
+    description: "Fresh, wholesome vegetarian meals delivered to your door.",
+    type: "website",
+    siteName: "Cloud Kitchen",
+  },
+  twitter: {
+    card: "summary",
+    title: "Cloud Kitchen — Pure Veg",
+    description: "Fresh, wholesome vegetarian meals delivered to your door.",
+  },
 };
 
 export const viewport = {
   themeColor: "#064e3b",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 export default function RootLayout({ children }) {

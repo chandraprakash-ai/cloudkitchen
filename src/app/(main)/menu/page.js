@@ -110,9 +110,26 @@ function MenuContent() {
             {/* Menu Grid */}
             <main className="px-4 py-4 min-h-[50vh]">
                 {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-                        <div className="w-10 h-10 border-4 border-emerald/30 border-t-emerald rounded-full animate-spin mb-4"></div>
-                        <p className="text-sm font-medium text-gray-500">Loading fresh menu...</p>
+                    <div className="grid grid-cols-2 gap-3 animate-pulse">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                            <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100/50">
+                                {/* Image skeleton */}
+                                <div className="aspect-[4/3] bg-gray-200"></div>
+                                {/* Content skeleton */}
+                                <div className="p-3">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="w-4 h-4 rounded-sm bg-gray-200"></div>
+                                        <div className="w-12 h-3 rounded-full bg-gray-200"></div>
+                                    </div>
+                                    <div className="w-3/4 h-4 rounded-md bg-gray-200 mb-1"></div>
+                                    <div className="w-1/2 h-3 rounded-md bg-gray-200 mb-2"></div>
+                                    <div className="flex justify-between items-end mt-3">
+                                        <div className="w-10 h-4 rounded-md bg-gray-200"></div>
+                                        <div className="w-16 h-8 rounded-xl bg-gray-200"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : (
                     <>

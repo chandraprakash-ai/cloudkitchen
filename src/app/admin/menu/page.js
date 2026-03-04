@@ -13,6 +13,9 @@ export default function MenuManager() {
     const [isSaving, setIsSaving] = useState(false);
     const [isAdjusting, setIsAdjusting] = useState(false);
     const [dragStart, setDragStart] = useState(null);
+    const [selectedItems, setSelectedItems] = useState(new Set());
+    const [isBulkOperating, setIsBulkOperating] = useState(false);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
     const fileInputRef = useRef(null);
     const imgContainerRef = useRef(null);
 
@@ -30,7 +33,8 @@ export default function MenuManager() {
     const getCropStyle = useCallback((pos) => {
         const c = parseCrop(pos);
         return {
-            transform: `scale(${c.z}) translate(${c.x}px, ${c.y}px)`,
+            objectPosition: `calc(50% + ${c.x}px) calc(50% + ${c.y}px)`,
+            transform: `scale(${c.z})`,
             transformOrigin: 'center center',
         };
     }, [parseCrop]);
@@ -155,9 +159,17 @@ export default function MenuManager() {
         setImageFile(null);
     };
 
-    const handleDeleteClick = async (id) => {
-        if (!window.confirm("Are you sure you want to permanently delete this item?")) return;
+    const handleDeleteClick = (id) => {
+        setConfirmModal({
+            isOpen: true,
+            title: "Delete Item",
+            message: "Are you sure you want to permanently delete this item? This action cannot be undone.",
+            onConfirm: () => confirmDeleteSingle(id)
+        });
+    };
 
+    const confirmDeleteSingle = async (id) => {
+        setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: null });
         const itemToDelete = items.find(i => i.id === id);
 
         // Optimistic UI updates
@@ -175,7 +187,77 @@ export default function MenuManager() {
         if (error) {
             console.error("Error deleting item:", error);
             alert("Failed to delete item: " + error?.message);
+            fetchItems(); // revert optimistic update
         }
+    };
+
+    const toggleItemSelection = (id) => {
+        setSelectedItems(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleBulkStockToggle = async (inStock) => {
+        if (selectedItems.size === 0) return;
+        setIsBulkOperating(true);
+        const ids = Array.from(selectedItems);
+
+        setItems(items.map(i => ids.includes(i.id) ? { ...i, in_stock: inStock } : i));
+
+        const { error } = await supabase.from('menu_items')
+            .update({ in_stock: inStock })
+            .in('id', ids);
+
+        if (error) {
+            console.error("Bulk stock update error:", error);
+            alert("Failed to update some items.");
+            fetchItems();
+        }
+        setIsBulkOperating(false);
+        setSelectedItems(new Set());
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (selectedItems.size === 0) return;
+        setConfirmModal({
+            isOpen: true,
+            title: "Delete Selected",
+            message: `Are you sure you want to permanently delete ${selectedItems.size} items? This action cannot be undone.`,
+            onConfirm: confirmBulkDelete
+        });
+    };
+
+    const confirmBulkDelete = async () => {
+        setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: null });
+
+        setIsBulkOperating(true);
+        const ids = Array.from(selectedItems);
+        const itemsToDelete = items.filter(i => ids.includes(i.id));
+
+        setItems(items.filter(i => !ids.includes(i.id)));
+
+        const { error } = await supabase.from('menu_items').delete().in('id', ids);
+
+        if (!error) {
+            for (const item of itemsToDelete) {
+                if (item.image && item.image.includes('/storage/v1/object/public/menu-images/')) {
+                    const oldPath = item.image.split('/public/menu-images/')[1];
+                    if (oldPath) {
+                        await supabase.storage.from('menu-images').remove([oldPath]);
+                    }
+                }
+            }
+        } else {
+            console.error("Bulk delete error:", error);
+            alert("Failed to delete some items.");
+            fetchItems();
+        }
+
+        setIsBulkOperating(false);
+        setSelectedItems(new Set());
     };
 
     const toggleCategory = (categoryId) => {
@@ -231,24 +313,45 @@ export default function MenuManager() {
         );
     }, [items, searchTerm]);
 
+    const toggleAllSelection = () => {
+        if (selectedItems.size === filteredItems.length) {
+            setSelectedItems(new Set());
+        } else {
+            setSelectedItems(new Set(filteredItems.map(i => i.id)));
+        }
+    };
+
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm animate-fade-in flex flex-col h-full overflow-hidden">
             {/* Header Actions */}
-            <div className="p-4 lg:p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center sticky top-0 bg-white rounded-t-2xl z-20">
-                <div className="relative w-full sm:w-auto">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-[18px]">search</span>
-                    <input
-                        type="text"
-                        placeholder="Search menu items..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full sm:w-80 h-10 pl-9 pr-4 rounded-xl bg-surface border-0 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-light/30"
-                    />
-                </div>
-                <button onClick={handleAddClick} className="w-full sm:w-auto h-10 px-5 rounded-xl bg-emerald text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-dark transition-colors shadow-sm">
-                    <span className="material-symbols-outlined text-[18px]">add</span>
-                    Add New Item
-                </button>
+            <div className="p-4 lg:p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center sticky top-0 bg-white rounded-t-2xl z-20 min-h-[80px]">
+                {selectedItems.size > 0 ? (
+                    <div className="flex-1 flex flex-wrap items-center gap-3 animate-fade-in w-full">
+                        <span className="text-sm font-bold text-emerald whitespace-nowrap">{selectedItems.size} selected</span>
+                        <div className="hidden sm:block h-4 w-px bg-gray-200"></div>
+                        <button onClick={() => handleBulkStockToggle(true)} disabled={isBulkOperating} className="text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors whitespace-nowrap">Mark In Stock</button>
+                        <button onClick={() => handleBulkStockToggle(false)} disabled={isBulkOperating} className="text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors whitespace-nowrap">Mark Sold Out</button>
+                        <button onClick={handleBulkDeleteClick} disabled={isBulkOperating} className="text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors whitespace-nowrap">Delete Selected</button>
+                        <button onClick={() => setSelectedItems(new Set())} className="sm:ml-auto text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2 transition-colors">Cancel</button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="relative w-full sm:w-auto">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 material-symbols-outlined text-[18px]">search</span>
+                            <input
+                                type="text"
+                                placeholder="Search menu items..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full sm:w-80 h-10 pl-9 pr-4 rounded-xl bg-surface border-0 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-light/30"
+                            />
+                        </div>
+                        <button onClick={handleAddClick} className="w-full sm:w-auto h-10 px-5 rounded-xl bg-emerald text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-emerald-dark transition-colors shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">add</span>
+                            Add New Item
+                        </button>
+                    </>
+                )}
             </div>
 
             {/* Data Table */}
@@ -256,7 +359,15 @@ export default function MenuManager() {
                 <table className="w-full text-left border-collapse min-w-[850px]">
                     <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 shadow-sm">
                         <tr>
-                            <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-12 text-center">No.</th>
+                            <th className="px-4 py-4 w-12 text-center">
+                                <input
+                                    type="checkbox"
+                                    checked={filteredItems.length > 0 && selectedItems.size === filteredItems.length}
+                                    onChange={toggleAllSelection}
+                                    className="w-4 h-4 rounded text-emerald focus:ring-emerald cursor-pointer accent-emerald"
+                                />
+                            </th>
+                            <th className="px-2 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-12 text-center">No.</th>
                             <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-16">Image</th>
                             <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider">Item Name & Details</th>
                             <th className="px-6 py-4 text-[11px] font-bold text-gray-500 uppercase tracking-wider w-32">Category</th>
@@ -267,8 +378,16 @@ export default function MenuManager() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
                         {filteredItems.map((item, i) => (
-                            <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors animate-slide-up opacity-0 stagger-${Math.min(i + 1, 6)}`} style={{ animationFillMode: 'forwards' }}>
-                                <td className="px-6 py-4 text-center">
+                            <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors animate-slide-up opacity-0 stagger-${Math.min(i + 1, 6)} ${selectedItems.has(item.id) ? 'bg-emerald-50/20' : ''}`} style={{ animationFillMode: 'forwards' }}>
+                                <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedItems.has(item.id)}
+                                        onChange={() => toggleItemSelection(item.id)}
+                                        className="w-4 h-4 rounded text-emerald focus:ring-emerald cursor-pointer accent-emerald"
+                                    />
+                                </td>
+                                <td className="px-2 py-4 text-center">
                                     <span className="text-xs font-bold text-gray-400">{i + 1}</span>
                                 </td>
                                 <td className="px-6 py-4">
@@ -337,8 +456,17 @@ export default function MenuManager() {
             {/* Edit Item Modal */}
             {editingItem && editForm && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in"
+                    className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in outline-none"
+                    tabIndex={0}
+                    ref={(el) => {
+                        // Auto-focus the modal when it opens so paste works immediately
+                        if (el && document.activeElement !== el && !el.contains(document.activeElement)) {
+                            el.focus();
+                        }
+                    }}
                     onPaste={handlePaste}
+                    onDrop={(e) => { if (!isAdjusting) handleDrop(e); }}
+                    onDragOver={(e) => { if (!isAdjusting) handleDragOver(e); }}
                 >
                     <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-scale-up">
                         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sticky top-0 z-10">
@@ -356,9 +484,7 @@ export default function MenuManager() {
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Item Photo</label>
                                     <div
                                         ref={imgContainerRef}
-                                        className={`w-full aspect-[16/9] rounded-xl shrink-0 border-2 bg-gray-950 overflow-hidden relative group transition-all flex flex-col items-center justify-center ${editForm.image ? 'border-transparent' : 'border-dashed border-gray-300 hover:border-emerald hover:bg-emerald-50/50 cursor-pointer bg-gray-50'} ${isAdjusting ? 'cursor-grab active:cursor-grabbing ring-2 ring-emerald ring-offset-2' : ''}`}
-                                        onDrop={(e) => { if (!isAdjusting) handleDrop(e); }}
-                                        onDragOver={(e) => { if (!isAdjusting) handleDragOver(e); }}
+                                        className={`w-full aspect-square rounded-xl shrink-0 border-2 bg-gray-950 overflow-hidden relative group transition-all flex flex-col items-center justify-center ${editForm.image ? 'border-transparent' : 'border-dashed border-gray-300 hover:border-emerald hover:bg-emerald-50/50 cursor-pointer bg-gray-50'} ${isAdjusting ? 'cursor-grab active:cursor-grabbing ring-2 ring-emerald ring-offset-2' : ''}`}
                                         onClick={() => !editForm.image && !isAdjusting && fileInputRef.current?.click()}
                                         onMouseDown={(e) => {
                                             if (!isAdjusting || !editForm.image) return;
@@ -643,6 +769,34 @@ export default function MenuManager() {
                 </div>
             )
             }
+
+            {/* Global Confirm Modal */}
+            {confirmModal.isOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-scale-up p-6">
+                        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                            <span className="material-symbols-outlined text-red-500 text-[24px]">warning</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-surface-dark mb-2">{confirmModal.title}</h2>
+                        <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+
+                        <div className="flex justify-end gap-3 w-full">
+                            <button
+                                onClick={() => setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: null })}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmModal.onConfirm}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors shadow-sm"
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

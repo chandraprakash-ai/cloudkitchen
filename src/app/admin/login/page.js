@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/utils/supabase/client";
 
 export default function AdminLogin() {
-    const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -14,18 +15,33 @@ export default function AdminLogin() {
         setIsLoading(true);
         setError(null);
 
-        // Simulated local authentication
-        setTimeout(() => {
-            if (username === "admin" && password === "admin1234") {
-                localStorage.setItem("adminAuth", "true");
-                router.push("/admin");
-            } else {
-                setError("Invalid Operator ID or Passcode.");
-            }
-            setIsLoading(false);
-        }, 600);
-    };
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
 
+        if (authError) {
+            setError(authError.message === "Invalid login credentials"
+                ? "Invalid email or password."
+                : authError.message
+            );
+            setIsLoading(false);
+            return;
+        }
+
+        // Check if user has admin role in metadata
+        const isAdmin = data.user?.user_metadata?.role === "admin";
+        if (!isAdmin) {
+            setError("This account does not have admin access.");
+            await supabase.auth.signOut();
+            setIsLoading(false);
+            return;
+        }
+
+        localStorage.setItem("adminAuth", "true");
+        router.push("/admin");
+        setIsLoading(false);
+    };
 
     return (
         <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4 selection:bg-emerald-light/30 filter relative overflow-hidden">
@@ -51,14 +67,14 @@ export default function AdminLogin() {
                         )}
 
                         <div className="space-y-1.5 group">
-                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1 group-focus-within:text-emerald transition-colors">Operator ID</label>
+                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1 group-focus-within:text-emerald transition-colors">Admin Email</label>
                             <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[20px] group-focus-within:text-emerald transition-colors">badge</span>
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[20px] group-focus-within:text-emerald transition-colors">mail</span>
                                 <input
-                                    type="text"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    placeholder="Enter username (e.g. admin)"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="admin@cloudkitchen.in"
                                     className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-medium text-surface-dark placeholder:text-gray-400 focus:outline-none focus:border-emerald focus:ring-4 focus:ring-emerald/10 transition-all"
                                     required
                                 />

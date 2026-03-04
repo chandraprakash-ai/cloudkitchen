@@ -5,6 +5,7 @@ import { supabase } from "@/utils/supabase/client";
 export default function OrdersManager() {
     const [orders, setOrders] = useState({ new: [], cooking: [], ready: [] });
     const [loading, setLoading] = useState(true);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
 
     useEffect(() => {
         fetchOrders();
@@ -78,6 +79,36 @@ export default function OrdersManager() {
         }
     };
 
+    const handleRejectClick = (dbId) => {
+        setConfirmModal({
+            isOpen: true,
+            title: "Reject Order",
+            message: "Are you sure you want to reject and cancel this order? This action cannot be undone.",
+            onConfirm: () => confirmRejectOrder(dbId)
+        });
+    };
+
+    const confirmRejectOrder = async (dbId) => {
+        setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: null });
+
+        // Optimistic UI update
+        setOrders(prev => ({
+            ...prev,
+            new: prev.new.filter(o => o.id !== dbId)
+        }));
+
+        // Database update
+        const { error } = await supabase
+            .from('orders')
+            .update({ status: 'rejected' })
+            .eq('id', dbId);
+
+        if (error) {
+            console.error("Failed to reject order:", error);
+            fetchOrders(); // Revert on error
+        }
+    };
+
     const Column = ({ title, count, color, id, items, nextCol, nextLabel }) => (
         <div className={`flex flex-col h-[450px] lg:h-[calc(100vh-140px)] bg-${color}-50/30 rounded-2xl border border-${color}-100 overflow-hidden`}>
             <div className={`p-4 border-b border-${color}-100 bg-${color}-100 flex justify-between items-center sticky top-0 z-10`}>
@@ -121,15 +152,25 @@ export default function OrdersManager() {
                                 <span className="text-[11px] font-medium text-gray-600">{order.customer}</span>
                             </div>
 
-                            {nextCol && (
-                                <button
-                                    onClick={() => moveOrder(order.id, id, nextCol)}
-                                    className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-${color}-100 hover:bg-${color}-200 text-${color}-700 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
-                                >
-                                    {nextLabel}
-                                    <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {id === 'new' && (
+                                    <button
+                                        onClick={() => handleRejectClick(order.id)}
+                                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
+                                    >
+                                        Reject
+                                    </button>
+                                )}
+                                {nextCol && (
+                                    <button
+                                        onClick={() => moveOrder(order.id, id, nextCol)}
+                                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-${color}-100 hover:bg-${color}-200 text-${color}-700 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
+                                    >
+                                        {nextLabel}
+                                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -192,6 +233,34 @@ export default function OrdersManager() {
                     items={orders.ready}
                 />
             </div>
+
+            {/* Global Confirm Modal */}
+            {confirmModal.isOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden flex flex-col shadow-2xl animate-scale-up p-6">
+                        <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                            <span className="material-symbols-outlined text-red-500 text-[24px]">warning</span>
+                        </div>
+                        <h2 className="text-xl font-bold text-surface-dark mb-2">{confirmModal.title}</h2>
+                        <p className="text-sm text-gray-500 mb-6">{confirmModal.message}</p>
+
+                        <div className="flex justify-end gap-3 w-full">
+                            <button
+                                onClick={() => setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: null })}
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmModal.onConfirm}
+                                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors shadow-sm"
+                            >
+                                Confirm
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

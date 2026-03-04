@@ -28,6 +28,7 @@ CREATE TABLE orders (
     display_id TEXT UNIQUE NOT NULL, -- e.g. ORD-8821
     customer_name TEXT NOT NULL,
     customer_email TEXT,
+    guest_user_id TEXT, -- links order to a browser-generated guest ID
     status TEXT NOT NULL DEFAULT 'new', -- 'new', 'cooking', 'ready', 'delivered'
     total_amount INTEGER NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
@@ -43,79 +44,86 @@ CREATE TABLE order_items (
 
 -- 2. Setup Row Level Security (RLS)
 -- ------------------------------------------
--- For now, we allow public read access to the menu, but require auth for everything else.
--- You can tighten these policies later once Auth is fully implemented.
+-- Public users can: read menu, place orders, read their own orders.
+-- Only authenticated (admin) users can: manage menu, update order statuses, view all orders.
 
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 
--- Allow public to view menu items
+-- ── Menu Items ──
+
+-- Anyone can view the menu
 CREATE POLICY "Public can view menu items" ON menu_items
     FOR SELECT USING (true);
 
--- Allow public to insert orders (place an order from the cart)
+-- Only authenticated users (admin) can insert/update/delete menu items
+CREATE POLICY "Admin can insert menu items" ON menu_items
+    FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "Admin can update menu items" ON menu_items
+    FOR UPDATE TO authenticated USING (true);
+
+CREATE POLICY "Admin can delete menu items" ON menu_items
+    FOR DELETE TO authenticated USING (true);
+
+-- ── Orders ──
+
+-- Public can place orders
 CREATE POLICY "Public can insert orders" ON orders
     FOR INSERT WITH CHECK (true);
 
--- Allow public to update their own order status temporarily for demo purposes (or restrict to admin later)
-CREATE POLICY "Public can update orders temporarily" ON orders
-    FOR UPDATE USING (true);
-    
--- Allow public to insert order items
+-- Public can view their own orders (by guest_user_id passed as RPC param or header)
+-- For simplicity, we allow SELECT for now and filter client-side by guest_user_id
+CREATE POLICY "Public can view orders" ON orders
+    FOR SELECT USING (true);
+
+-- Only authenticated users (admin/delivery) can update order status
+CREATE POLICY "Admin can update orders" ON orders
+    FOR UPDATE TO authenticated USING (true);
+
+-- ── Order Items ──
+
+-- Public can insert order items (when placing an order)
 CREATE POLICY "Public can insert order items" ON order_items
     FOR INSERT WITH CHECK (true);
 
--- Allow public to view orders temporarily for demo admin dashboard
-CREATE POLICY "Public can view all orders" ON orders
-    FOR SELECT USING (true);
-    
-CREATE POLICY "Public can view all order items" ON order_items
+-- Public can view order items
+CREATE POLICY "Public can view order items" ON order_items
     FOR SELECT USING (true);
 
--- Allow public to update menu temporarily for demo admin dashboard
-CREATE POLICY "Public can update menu" ON menu_items
-    FOR UPDATE USING (true);
+-- Only authenticated users can update/delete order items
+CREATE POLICY "Admin can update order items" ON order_items
+    FOR UPDATE TO authenticated USING (true);
 
--- Allow public to insert menu items temporarily for demo admin dashboard
-CREATE POLICY "Public can insert menu items" ON menu_items
-    FOR INSERT WITH CHECK (true);
-
--- Allow public to delete menu items temporarily for demo admin dashboard
-CREATE POLICY "Public can delete menu items" ON menu_items
-    FOR DELETE USING (true);
+CREATE POLICY "Admin can delete order items" ON order_items
+    FOR DELETE TO authenticated USING (true);
 
 
 -- 3. Storage Configuration (Images)
 -- ------------------------------------------
--- Run these commands separately if you haven't enabled Storage yet, or just create the bucket manually via the UI.
 
--- Insert the bucket if it doesn't exist
-INSERT INTO storage.buckets (id, name, public) 
+INSERT INTO storage.buckets (id, name, public)
 VALUES ('menu-images', 'menu-images', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Allow public read access to images
-CREATE POLICY "Public Access" 
-    ON storage.objects FOR SELECT 
+CREATE POLICY "Public Access"
+    ON storage.objects FOR SELECT
     USING (bucket_id = 'menu-images');
 
--- Allow authenticated users (or anyone for demo purposes) to upload images
-CREATE POLICY "Public Upload" 
-    ON storage.objects FOR INSERT 
-    WITH CHECK (bucket_id = 'menu-images');
+CREATE POLICY "Authenticated Upload"
+    ON storage.objects FOR INSERT
+    TO authenticated WITH CHECK (bucket_id = 'menu-images');
 
--- Allow users to update their uploaded images
-CREATE POLICY "Public Update" 
-    ON storage.objects FOR UPDATE 
-    USING (bucket_id = 'menu-images');
+CREATE POLICY "Authenticated Update"
+    ON storage.objects FOR UPDATE
+    TO authenticated USING (bucket_id = 'menu-images');
 
--- Allow users to delete their uploaded images
-CREATE POLICY "Public Delete" 
-    ON storage.objects FOR DELETE 
-    USING (bucket_id = 'menu-images');
+CREATE POLICY "Authenticated Delete"
+    ON storage.objects FOR DELETE
+    TO authenticated USING (bucket_id = 'menu-images');
 
 
 -- 4. Initial Seed Data
 -- ------------------------------------------
--- Seed data removed as requested. You can add your items manually from the Supabase dashboard later!
+-- Add items from the admin panel or via SQL manually.

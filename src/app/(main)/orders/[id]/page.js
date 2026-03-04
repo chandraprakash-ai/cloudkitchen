@@ -18,23 +18,28 @@ export default function OrderDetailsPage() {
     const [loading, setLoading] = useState(true);
 
     const fetchOrder = async () => {
-        const { data, error } = await supabase
-            .from("orders")
-            .select("*")
-            .eq("id", id)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from("orders")
+                .select("*")
+                .eq("id", id)
+                .single();
 
-        if (!error && data) {
-            setOrder(data);
+            if (!error && data) {
+                setOrder(data);
 
-            const { data: orderItems } = await supabase
-                .from("order_items")
-                .select("*, menu_items(name, image, price)")
-                .eq("order_id", data.id);
+                const { data: orderItems } = await supabase
+                    .from("order_items")
+                    .select("*, menu_items(name, image, price)")
+                    .eq("order_id", data.id);
 
-            if (orderItems) setItems(orderItems);
+                if (orderItems) setItems(orderItems);
+            }
+        } catch (error) {
+            console.error("Error fetching order details:", error);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
@@ -94,8 +99,8 @@ export default function OrderDetailsPage() {
             <main className="px-5 py-5 space-y-5">
                 {/* Status Banner */}
                 <div className={`rounded-2xl p-5 text-center ${isDelivered
-                        ? "bg-emerald-50 border border-emerald-100"
-                        : "bg-amber-50 border border-amber-100"
+                    ? "bg-emerald-50 border border-emerald-100"
+                    : "bg-amber-50 border border-amber-100"
                     }`}>
                     <div className={`w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center ${isDelivered ? "bg-emerald-100" : "bg-amber-100"
                         }`}>
@@ -127,10 +132,10 @@ export default function OrderDetailsPage() {
                                     <div className="flex flex-col items-center">
                                         <div
                                             className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all ${isActive
-                                                    ? "bg-emerald-500 ring-4 ring-emerald-100"
-                                                    : isCompleted
-                                                        ? "bg-emerald-500"
-                                                        : "bg-gray-200"
+                                                ? "bg-emerald-500 ring-4 ring-emerald-100"
+                                                : isCompleted
+                                                    ? "bg-emerald-500"
+                                                    : "bg-gray-200"
                                                 }`}
                                         >
                                             <span className={`material-symbols-outlined text-[14px] ${isCompleted ? "text-white filled" : "text-gray-400"

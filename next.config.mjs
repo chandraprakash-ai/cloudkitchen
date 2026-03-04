@@ -9,10 +9,12 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!supabaseUrl) return [];
     return [
       {
         source: '/req-proxy/:path*',
-        destination: 'https://bqacfcanqwmyabubnzkp.supabase.co/:path*',
+        destination: `${supabaseUrl}/:path*`,
       },
     ];
   },

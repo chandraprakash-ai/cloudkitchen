@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
 const STEPS = [
@@ -11,6 +12,7 @@ const STEPS = [
 ];
 
 export default function ActiveOrderCard() {
+    const { user } = useAuth();
     const [order, setOrder] = useState(null);
     const [items, setItems] = useState([]);
 
@@ -18,7 +20,7 @@ export default function ActiveOrderCard() {
         async function fetchActiveOrder() {
             try {
                 if (typeof window === "undefined") return;
-                const userId = localStorage.getItem("guest_user_id");
+                const userId = user?.id || localStorage.getItem("guest_user_id");
 
                 if (!userId) {
                     setOrder(null);

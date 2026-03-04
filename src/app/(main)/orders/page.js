@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/utils/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 const STATUS_LABELS = {
     new: { label: "Placed", color: "blue", icon: "receipt_long" },
@@ -11,22 +12,16 @@ const STATUS_LABELS = {
 };
 
 export default function OrdersPage() {
+    const { user } = useAuth();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState("active"); // active | history
+    const [tab, setTab] = useState("active");
 
     useEffect(() => {
         async function fetchOrders() {
             try {
                 if (typeof window === "undefined") return;
-                let userId = localStorage.getItem("guest_user_id");
-
-                // If there's absolutely no user ID string available locally, they have not placed any orders yet.
-                if (!userId) {
-                    setOrders([]);
-                    setLoading(false);
-                    return;
-                }
+                let userId = user?.id || localStorage.getItem("guest_user_id");
 
                 const { data, error } = await supabase
                     .from("orders")

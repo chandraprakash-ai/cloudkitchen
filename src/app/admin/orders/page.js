@@ -146,17 +146,17 @@ export default function OrdersManager() {
 
                         <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
                             <div className="flex items-center gap-1.5">
-                                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
+                                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
                                     {order.customer.charAt(0)}
                                 </div>
-                                <span className="text-[11px] font-medium text-gray-600">{order.customer}</span>
+                                <span className="text-sm font-bold text-gray-800">{order.customer}</span>
                             </div>
 
                             <div className="flex items-center gap-2">
                                 {id === 'new' && (
                                     <button
                                         onClick={() => handleRejectClick(order.id)}
-                                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-red-50 hover:bg-red-100 text-red-600 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
+                                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
                                     >
                                         Reject
                                     </button>
@@ -164,10 +164,10 @@ export default function OrdersManager() {
                                 {nextCol && (
                                     <button
                                         onClick={() => moveOrder(order.id, id, nextCol)}
-                                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-${color}-100 hover:bg-${color}-200 text-${color}-700 text-[10px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
+                                        className={`opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity bg-${color}-100 hover:bg-${color}-200 text-${color}-700 text-sm font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 whitespace-nowrap`}
                                     >
                                         {nextLabel}
-                                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                                        <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
                                     </button>
                                 )}
                             </div>

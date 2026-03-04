@@ -1,7 +1,6 @@
+"use client";
+import { AuthProvider } from "@/context/AuthContext";
+
 export default function DeliveryLayout({ children }) {
-    return (
-        <div className="min-h-dvh bg-gray-50">
-            {children}
-        </div>
-    );
+    return <AuthProvider>{children}</AuthProvider>;
 }

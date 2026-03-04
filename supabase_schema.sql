@@ -28,7 +28,8 @@ CREATE TABLE orders (
     display_id TEXT UNIQUE NOT NULL, -- e.g. ORD-8821
     customer_name TEXT NOT NULL,
     customer_email TEXT,
-    guest_user_id TEXT, -- links order to a browser-generated guest ID
+    customer_phone TEXT,
+    user_id UUID REFERENCES auth.users(id), -- links order to an authenticated user
     status TEXT NOT NULL DEFAULT 'new', -- 'new', 'cooking', 'ready', 'delivered'
     total_amount INTEGER NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
@@ -73,8 +74,8 @@ CREATE POLICY "Admin can delete menu items" ON menu_items
 CREATE POLICY "Public can insert orders" ON orders
     FOR INSERT WITH CHECK (true);
 
--- Public can view their own orders (by guest_user_id passed as RPC param or header)
--- For simplicity, we allow SELECT for now and filter client-side by guest_user_id
+-- Public can view their own orders (by user_id)
+-- For simplicity, we allow SELECT for now and filter client-side by user_id
 CREATE POLICY "Public can view orders" ON orders
     FOR SELECT USING (true);
 

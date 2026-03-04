@@ -21,7 +21,11 @@ export default function OrdersPage() {
         async function fetchOrders() {
             try {
                 if (typeof window === "undefined") return;
-                let userId = user?.id || localStorage.getItem("guest_user_id");
+
+                if (!user?.id) {
+                    setLoading(false);
+                    return;
+                }
 
                 const { data, error } = await supabase
                     .from("orders")
@@ -33,7 +37,7 @@ export default function OrdersPage() {
                             menu_items ( name, image )
                         )
                     `)
-                    .eq("guest_user_id", userId)
+                    .eq("user_id", user.id)
                     .order("created_at", { ascending: false });
 
                 if (!error && data) setOrders(data);
@@ -47,7 +51,7 @@ export default function OrdersPage() {
         fetchOrders();
         const interval = setInterval(fetchOrders, 15000);
         return () => clearInterval(interval);
-    }, []);
+    }, [user]);
 
     const activeOrders = orders.filter((o) => ["new", "cooking", "ready"].includes(o.status));
     const historyOrders = orders.filter((o) => o.status === "delivered");

@@ -2,45 +2,22 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/utils/supabase/client";
 
+import { useAuth } from "@/context/AuthContext";
+
 const STATUS_CONFIG = {
     ready: { label: "Ready for Pickup", icon: "takeout_dining", color: "amber" },
     delivered: { label: "Delivered", icon: "check_circle", color: "emerald" },
 };
 
-const DELIVERY_PASSCODE = "deliver2024"; // Change this for production
-
 export default function DeliveryDashboard() {
+    const { user, requireAuth } = useAuth();
     const [orders, setOrders] = useState({ ready: [], delivered: [] });
     const [loading, setLoading] = useState(true);
     const [delivering, setDelivering] = useState(null);
     const [tab, setTab] = useState("ready");
 
-    // Auth gate
-    const [isAuthed, setIsAuthed] = useState(false);
-    const [passcode, setPasscode] = useState("");
-    const [authError, setAuthError] = useState("");
-
-    useEffect(() => {
-        if (typeof window !== "undefined") {
-            setIsAuthed(localStorage.getItem("deliveryAuth") === "true");
-        }
-    }, []);
-
-    const handlePasscodeSubmit = (e) => {
-        e.preventDefault();
-        if (passcode === DELIVERY_PASSCODE) {
-            localStorage.setItem("deliveryAuth", "true");
-            setIsAuthed(true);
-            setAuthError("");
-        } else {
-            setAuthError("Invalid passcode");
-        }
-    };
-
-    const handleSignOut = () => {
-        localStorage.removeItem("deliveryAuth");
-        setIsAuthed(false);
-        setPasscode("");
+    const handleSignOut = async () => {
+        // Typically rely on auth context, but could be simple UI reset if needed
     };
 
     const fetchOrders = async () => {
@@ -113,42 +90,23 @@ export default function DeliveryDashboard() {
     const deliveredCount = orders.delivered.length;
     const activeOrders = tab === "ready" ? orders.ready : orders.delivered;
 
-    // ── Auth Gate ──
-    if (!isAuthed) {
+    if (!user) {
         return (
-            <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-[360px]">
-                    <div className="text-center mb-8">
-                        <div className="w-14 h-14 bg-gray-900 text-white flex items-center justify-center rounded-2xl mx-auto mb-4">
-                            <span className="material-symbols-outlined text-[28px]">local_shipping</span>
-                        </div>
-                        <h1 className="font-display text-3xl text-surface-dark mb-1">Delivery Access</h1>
-                        <p className="text-sm text-gray-400">Enter your delivery partner passcode</p>
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+                <div className="max-w-md w-full bg-white rounded-3xl p-8 text-center space-y-6 shadow-sm border border-gray-100">
+                    <div className="w-20 h-20 bg-emerald-50 text-emerald rounded-2xl flex items-center justify-center mx-auto mb-2">
+                        <span className="material-symbols-outlined text-[40px]">two_wheeler</span>
                     </div>
-                    <form onSubmit={handlePasscodeSubmit} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
-                        {authError && (
-                            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium text-center">
-                                {authError}
-                            </div>
-                        )}
-                        <div>
-                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider ml-1 mb-1.5 block">Passcode</label>
-                            <input
-                                type="password"
-                                value={passcode}
-                                onChange={(e) => setPasscode(e.target.value)}
-                                placeholder="••••••••"
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3.5 px-4 text-sm font-medium text-surface-dark placeholder:text-gray-400 focus:outline-none focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10 transition-all"
-                                required
-                            />
-                        </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-surface-dark mb-2">Delivery Partner</h1>
+                        <p className="text-gray-500 mb-6">Please sign in to view ready orders.</p>
                         <button
-                            type="submit"
-                            className="w-full bg-gray-900 text-white rounded-xl py-3.5 text-sm font-bold hover:bg-gray-800 transition-colors active:scale-[0.98]"
+                            onClick={() => requireAuth()}
+                            className="h-12 px-8 rounded-full bg-emerald text-white font-bold text-sm w-full hover:bg-emerald-dark transition-colors"
                         >
-                            Enter Dashboard
+                            Sign In
                         </button>
-                    </form>
+                    </div>
                 </div>
             </div>
         );
@@ -263,9 +221,18 @@ export default function DeliveryDashboard() {
                                     </div>
 
                                     {/* Customer */}
-                                    <div className="flex items-center gap-1.5 mb-3">
-                                        <span className="material-symbols-outlined text-[14px] text-gray-400">person</span>
-                                        <span className="text-[12px] text-gray-500 font-medium">{order.customer_name || "Guest"}</span>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-surface-dark mb-1">{order.customer_name}</h3>
+                                            <p className="text-[11px] text-gray-500 font-medium">Order {order.display_id}</p>
+
+                                            {order.customer_phone && (
+                                                <div className="mt-2 flex items-center gap-1.5 text-xs text-emerald-dark font-medium cursor-pointer" onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${order.customer_phone}`; }}>
+                                                    <span className="material-symbols-outlined text-[14px]">call</span>
+                                                    {order.customer_phone}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Items */}

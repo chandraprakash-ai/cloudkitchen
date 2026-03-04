@@ -18,6 +18,8 @@ export default function CartPage() {
     const { user, displayName, requireAuth } = useAuth();
     const router = useRouter();
     const [isCheckingOut, setIsCheckingOut] = useState(false);
+    const [customerPhone, setCustomerPhone] = useState("");
+    const [phoneError, setPhoneError] = useState("");
 
     // Promo code state
     const [promoInput, setPromoInput] = useState("");
@@ -61,6 +63,12 @@ export default function CartPage() {
     };
 
     const handleCheckout = () => {
+        if (!customerPhone || customerPhone.length < 10) {
+            setPhoneError("Please provide a valid 10-digit phone number");
+            return;
+        }
+        setPhoneError("");
+
         requireAuth(async () => {
             setIsCheckingOut(true);
             try {
@@ -68,25 +76,22 @@ export default function CartPage() {
                 const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
                 const displayId = `#ORD-${ts}-${rand}`;
 
-                // Fetch the freshest session to avoid stale closure if the user just logged in via the modal
+                // Since requireAuth guarantees a user, we can safely depend on session.user.id
                 const { data: { session } } = await supabase.auth.getSession();
-                let userId = session?.user?.id;
-                let finalCustomerName = displayName || session?.user?.user_metadata?.full_name || localStorage.getItem("ck-profile-name") || "Guest Customer";
+                const userId = session?.user?.id;
+                const finalCustomerName = displayName || session?.user?.user_metadata?.full_name || "Customer";
 
                 if (!userId) {
-                    userId = localStorage.getItem("guest_user_id");
-                    if (!userId) {
-                        userId = "guest_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                        localStorage.setItem("guest_user_id", userId);
-                    }
+                    throw new Error("You must be logged in to checkout");
                 }
 
                 const { data: orderParams, error: orderError } = await supabase.from('orders').insert({
                     display_id: displayId,
                     customer_name: finalCustomerName,
+                    customer_phone: customerPhone,
                     status: 'new',
                     total_amount: adjustedTotal,
-                    guest_user_id: userId
+                    user_id: userId
                 }).select().single();
 
                 if (orderError) throw orderError;
@@ -106,7 +111,7 @@ export default function CartPage() {
                 router.push('/');
             } catch (error) {
                 console.error("Checkout failed:", error);
-                alert("Failed to place order. Please try again.");
+                alert("Failed to place order: " + (error.message || error.details || "Unknown error"));
             } finally {
                 setIsCheckingOut(false);
             }
@@ -242,6 +247,26 @@ export default function CartPage() {
                     )}
                     {promoError && <p className="text-[11px] text-red-500 font-medium pl-8">{promoError}</p>}
                     {promoSuccess && !promoError && <p className="text-[11px] text-emerald font-medium pl-8">{promoSuccess}</p>}
+                </div>
+
+                {/* Contact Info */}
+                <div className="bg-white rounded-xl p-3 space-y-2">
+                    <h3 className="text-sm font-bold text-surface-dark mb-1">Contact Info</h3>
+                    <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined text-emerald text-[20px]">call</span>
+                        <input
+                            type="tel"
+                            placeholder="Enter 10-digit Mobile Number"
+                            className="flex-1 h-8 bg-transparent text-sm font-medium text-surface-dark placeholder:text-gray-400 outline-none border-b border-gray-100 focus:border-emerald transition-colors"
+                            value={customerPhone}
+                            onChange={(e) => {
+                                setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                                setPhoneError("");
+                            }}
+                            maxLength={10}
+                        />
+                    </div>
+                    {phoneError && <p className="text-[11px] text-red-500 font-medium pl-8">{phoneError}</p>}
                 </div>
 
                 {/* Payment Summary */}

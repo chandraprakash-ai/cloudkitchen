@@ -21,13 +21,12 @@ export default function ProfilePage() {
         const savedNotif = localStorage.getItem("ck-notifications");
         if (savedNotif === "true") setNotificationsEnabled(true);
 
-        // Fetch real order count — use auth user id or guest id
-        const userId = user?.id || localStorage.getItem("guest_user_id");
-        if (userId) {
+        // Fetch real order count — use auth user id
+        if (user?.id) {
             supabase
                 .from("orders")
                 .select("id", { count: "exact", head: true })
-                .eq("guest_user_id", userId)
+                .eq("user_id", user.id)
                 .then(({ count }) => {
                     if (count !== null) setOrderCount(count);
                 });
@@ -72,7 +71,6 @@ export default function ProfilePage() {
 
     const handleSignOut = async () => {
         await signOut();
-        localStorage.removeItem("guest_user_id");
     };
 
     const profileName = displayName || "Guest User";

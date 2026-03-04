@@ -19,10 +19,7 @@ export default function ActiveOrderCard() {
     useEffect(() => {
         async function fetchActiveOrder() {
             try {
-                if (typeof window === "undefined") return;
-                const userId = user?.id || localStorage.getItem("guest_user_id");
-
-                if (!userId) {
+                if (!user?.id) {
                     setOrder(null);
                     return;
                 }
@@ -31,7 +28,7 @@ export default function ActiveOrderCard() {
                 const { data: orders, error } = await supabase
                     .from("orders")
                     .select("*")
-                    .eq("guest_user_id", userId)
+                    .eq("user_id", user.id)
                     .in("status", ["new", "cooking", "ready"])
                     .order("created_at", { ascending: false })
                     .limit(1);
@@ -61,7 +58,7 @@ export default function ActiveOrderCard() {
         // Poll every 15 seconds for status updates
         const interval = setInterval(fetchActiveOrder, 15000);
         return () => clearInterval(interval);
-    }, []);
+    }, [user]);
 
     if (!order) return null;
 
